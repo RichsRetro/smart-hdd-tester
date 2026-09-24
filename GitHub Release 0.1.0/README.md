@@ -16,4 +16,4 @@ The source is provided under the Smart HDD personal, non-commercial source-avail
 
 ## Support
 
-Buy Me a Coffee: https://buymeacoffee.com/richsretro
+If you enjoy this app and find it useful please feel free to Buy Me a Coffee: https://buymeacoffee.com/richsretro
