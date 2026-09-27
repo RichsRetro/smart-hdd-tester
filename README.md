@@ -18,7 +18,7 @@ The APK in the v0.1.0 release folder is a debug build for testing, not a product
 
 ## Languages
 
-The app follows the Android system language by default, and English can be selected in Settings. Interface text, settings, surface-test information, and destructive-test warnings are translated for German, Spanish, French, Italian, Brazilian Portuguese, Dutch, and Polish. Some detailed SMART and surface-test diagnostic output still uses English technical wording.
+The app follows the Android system language by default. Settings also lets you choose English, German, Spanish, French, Italian, Brazilian Portuguese, Dutch, Polish, Russian, Japanese, Simplified Chinese, Korean, or Turkish. Main interface text, settings, surface-test information, and destructive-test warnings are translated; less common screens and detailed technical diagnostics may still use English.
 
 ## Source and licence
 
