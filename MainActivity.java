@@ -73,16 +73,16 @@ public class MainActivity extends Activity {
     private volatile boolean usbScanCancelRequested = false;
     private Runnable pendingUsbAction;
     private boolean usbPermissionReceiverRegistered = false;
-    private final Map<Button, int[]> originalButtonPadding = new WeakHashMap<>();
+    private final Map<View, int[]> originalButtonPadding = new WeakHashMap<>();
 
     @Override
     protected void attachBaseContext(Context base) {
         String language = base.getSharedPreferences("smart_hdd_settings", Context.MODE_PRIVATE)
                 .getString("app_language", "system");
-        if ("en".equals(language)) {
+        if (!"system".equals(language)) {
             android.content.res.Configuration configuration =
                     new android.content.res.Configuration(base.getResources().getConfiguration());
-            configuration.setLocale(Locale.ENGLISH);
+            configuration.setLocale(Locale.forLanguageTag(language));
             base = base.createConfigurationContext(configuration);
         }
         super.attachBaseContext(base);
@@ -157,21 +157,45 @@ public class MainActivity extends Activity {
     }
 
     private String getSelectedLanguageLabel() {
-        boolean english = "en".equals(getSharedPreferences("smart_hdd_settings", MODE_PRIVATE)
-                .getString("app_language", "system"));
-        return getString(english ? R.string.language_english : R.string.language_system_default);
+        String language = getSharedPreferences("smart_hdd_settings", MODE_PRIVATE)
+                .getString("app_language", "system");
+        int label = "en".equals(language) ? R.string.language_english
+                : "de".equals(language) ? R.string.language_german
+                : "es".equals(language) ? R.string.language_spanish
+                : "fr".equals(language) ? R.string.language_french
+                : "it".equals(language) ? R.string.language_italian
+                : "pt-BR".equals(language) ? R.string.language_portuguese_brazil
+                : "nl".equals(language) ? R.string.language_dutch
+                : "pl".equals(language) ? R.string.language_polish
+                : "ru".equals(language) ? R.string.language_russian
+                : "ja".equals(language) ? R.string.language_japanese
+                : "zh-CN".equals(language) ? R.string.language_chinese_simplified
+                : "ko".equals(language) ? R.string.language_korean
+                : "tr".equals(language) ? R.string.language_turkish
+                : R.string.language_system_default;
+        return getString(label);
     }
 
     private void showLanguagePicker() {
         String current = getSharedPreferences("smart_hdd_settings", MODE_PRIVATE)
                 .getString("app_language", "system");
-        int checked = "en".equals(current) ? 1 : 0;
-        String[] choices = { getString(R.string.language_system_default),
-                getString(R.string.language_english) };
+        String[] languageCodes = { "system", "en", "de", "es", "fr", "it", "pt-BR", "nl", "pl", "ru", "ja", "zh-CN", "ko", "tr" };
+        int[] languageNames = { R.string.language_system_default, R.string.language_english,
+                R.string.language_german, R.string.language_spanish, R.string.language_french,
+                R.string.language_italian, R.string.language_portuguese_brazil,
+                R.string.language_dutch, R.string.language_polish, R.string.language_russian,
+                R.string.language_japanese, R.string.language_chinese_simplified,
+                R.string.language_korean, R.string.language_turkish };
+        String[] choices = new String[languageNames.length];
+        int checked = 0;
+        for (int i = 0; i < languageNames.length; i++) {
+            choices[i] = getString(languageNames[i]);
+            if (languageCodes[i].equals(current)) checked = i;
+        }
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.language_picker_title)
                 .setSingleChoiceItems(choices, checked, (dialog, which) -> {
-                    String language = which == 1 ? "en" : "system";
+                    String language = languageCodes[which];
                     getSharedPreferences("smart_hdd_settings", MODE_PRIVATE).edit()
                             .putString("app_language", language).apply();
                     dialog.dismiss();
@@ -412,6 +436,16 @@ public class MainActivity extends Activity {
             bar.setIndeterminateTintList(tint);
         } else if (view instanceof Button) {
             Button button = (Button) view;
+            // Capture the layout's original spacing before changing its background.
+            // Android's default button drawable can install its own padding; if we
+            // capture after setBackgroundResource(), switching themes or returning
+            // to Settings makes that padding accumulate differently each time.
+            int[] original = originalButtonPadding.get(button);
+            if (original == null) {
+                original = new int[]{button.getPaddingLeft(), button.getPaddingTop(),
+                        button.getPaddingRight(), button.getPaddingBottom()};
+                originalButtonPadding.put(button, original);
+            }
             button.setTextColor(themeButtonText());
             if (isRetroTheme()) {
                 GradientDrawable retroButton = new GradientDrawable();
@@ -423,12 +457,6 @@ public class MainActivity extends Activity {
                 button.setBackgroundResource(android.R.drawable.btn_default);
                 button.setBackgroundTintList(ColorStateList.valueOf(themeButtonFill()));
             }
-            int[] original = originalButtonPadding.get(button);
-            if (original == null) {
-                original = new int[]{button.getPaddingLeft(), button.getPaddingTop(),
-                        button.getPaddingRight(), button.getPaddingBottom()};
-                originalButtonPadding.put(button, original);
-            }
             float buttonScale = preferredButtonScale();
             button.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
                     Math.max(11f, 14f * phoneScaleFactor() * preferredTextScale() * buttonScale));
@@ -439,6 +467,15 @@ public class MainActivity extends Activity {
             CompoundButton button = (CompoundButton) view;
             button.setTextColor(themePrimaryText());
             button.setButtonTintList(ColorStateList.valueOf(themeAccent()));
+            int[] original = originalButtonPadding.get(button);
+            if (original == null) {
+                original = new int[]{button.getPaddingLeft(), button.getPaddingTop(),
+                        button.getPaddingRight(), button.getPaddingBottom()};
+                originalButtonPadding.put(button, original);
+            }
+            float buttonScale = preferredButtonScale();
+            button.setPadding(original[0], Math.round(original[1] * buttonScale),
+                    original[2], Math.round(original[3] * buttonScale));
         } else if (view instanceof TextView) {
             TextView text = (TextView) view;
             Object saved = text.getTag();
@@ -499,27 +536,27 @@ public class MainActivity extends Activity {
         setResponsivePadding(subtitle, 0, 0, 0, 24);
 
         TextView safety = new TextView(this);
-        safety.setText("OFFLINE STORAGE DIAGNOSTICS\nSMART and surface checks are read-only");
+        safety.setText(R.string.safety_read_only);
         setResponsiveTextSize(safety, 14f);
         safety.setTextColor(Color.rgb(0, 100, 0));
         safety.setGravity(Gravity.CENTER);
         setResponsivePadding(safety, 0, 0, 0, 20);
 
         Button smartButton = new Button(this);
-        smartButton.setText("STORAGE HEALTH & SMART");
+        smartButton.setText(R.string.home_smart);
         Button surfaceButton = new Button(this);
-        surfaceButton.setText("READ-ONLY SURFACE TEST");
+        surfaceButton.setText(R.string.home_surface);
         Button mediaButton = new Button(this);
-        mediaButton.setText("SD CARD & INTERNAL NAND");
+        mediaButton.setText(R.string.home_media);
         Button settingsButton = new Button(this);
-        settingsButton.setText("SETTINGS / THEMES");
+        settingsButton.setText(R.string.home_settings);
         Button homeDisconnectButton = new Button(this);
-        homeDisconnectButton.setText("SAFE DISCONNECT USB");
+        homeDisconnectButton.setText(R.string.safe_disconnect_usb);
         Button aboutButton = new Button(this);
-        aboutButton.setText("ABOUT / SUPPORT");
+        aboutButton.setText(R.string.home_about);
 
         TextView footer = new TextView(this);
-        footer.setText("Smart HDD v0.1\n100% offline • Diagnostics are read-only");
+        footer.setText(R.string.home_footer);
         setResponsiveTextSize(footer, 12f);
         footer.setTextColor(Color.GRAY);
         footer.setGravity(Gravity.CENTER);
@@ -538,7 +575,7 @@ public class MainActivity extends Activity {
         layout.addView(aboutButton);
         layout.addView(footer);
         TextView fakeHeading = new TextView(this);
-        fakeHeading.setText("FAKE CARD DETECTOR");
+        fakeHeading.setText(R.string.fake_card_detector_title);
         setResponsiveTextSize(fakeHeading, 25f);
         fakeHeading.setTypeface(null, android.graphics.Typeface.BOLD);
         fakeHeading.setTextColor(Color.rgb(220, 35, 55));
@@ -551,7 +588,7 @@ public class MainActivity extends Activity {
         fakeWarning.setGravity(Gravity.CENTER);
         setResponsivePadding(fakeWarning, 8, 0, 8, 12);
         Button fakeButton = new Button(this);
-        fakeButton.setText("OPEN DESTRUCTIVE USB CARD TEST");
+        fakeButton.setText(R.string.home_fake_card_button);
         layout.addView(fakeHeading);
         layout.addView(fakeWarning);
         layout.addView(fakeButton);
@@ -583,9 +620,9 @@ public class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         setResponsivePadding(layout, 20, 20, 20, 20);
         Button back = new Button(this);
-        back.setText("BACK");
+        back.setText(R.string.back);
         TextView title = new TextView(this);
-        title.setText("FAKE CARD DETECTOR");
+        title.setText(R.string.fake_card_detector_title);
         setResponsiveTextSize(title, 24f);
         title.setTextColor(Color.rgb(220, 35, 55));
         title.setGravity(Gravity.CENTER);
@@ -597,12 +634,12 @@ public class MainActivity extends Activity {
         explanation.append(getString(R.string.fake_card_screen_note));
         fakeCardDeviceInfoText = new TextView(this);
         setResponsiveTextSize(fakeCardDeviceInfoText, 14f);
-        fakeCardDeviceInfoText.setText("Checking USB reader…");
+        fakeCardDeviceInfoText.setText(R.string.checking_usb_reader);
         setResponsivePadding(fakeCardDeviceInfoText, 0, 8, 0, 18);
         Button refresh = new Button(this);
-        refresh.setText("CHECK USB CARD AGAIN");
+        refresh.setText(R.string.check_usb_card_again);
         fakeCardStartButton = new Button(this);
-        fakeCardStartButton.setText("CONTINUE TO WARNINGS");
+        fakeCardStartButton.setText(R.string.continue_to_warnings);
         fakeCardStartButton.setEnabled(false);
         layout.addView(back);
         layout.addView(title);
@@ -623,7 +660,7 @@ public class MainActivity extends Activity {
         fakeCardProbeRunning = true;
         fakeCardTarget = null;
         runOnUiThread(() -> {
-            if (fakeCardDeviceInfoText != null) fakeCardDeviceInfoText.setText("Checking USB reader and card…");
+            if (fakeCardDeviceInfoText != null) fakeCardDeviceInfoText.setText(R.string.checking_usb_reader_card);
             if (fakeCardStartButton != null) fakeCardStartButton.setEnabled(false);
         });
         new Thread(() -> {
@@ -684,54 +721,54 @@ public class MainActivity extends Activity {
         if (target == null) return;
         final int[] selected = {0};
         new android.app.AlertDialog.Builder(this)
-                .setTitle("CHOOSE TEST TYPE")
+                .setTitle(R.string.choose_test_type)
                 .setSingleChoiceItems(new String[] {
-                        "QUICK CHECK — randomized samples; faster, but can miss some fakes",
-                        "FULL WRITE TEST — every sector; thorough, may take hours"
+                        getString(R.string.quick_mode_description),
+                        getString(R.string.full_mode_description)
                 }, 0, (dialog, which) -> selected[0] = which)
-                .setNegativeButton("CANCEL", null)
-                .setPositiveButton("CONTINUE TO WARNINGS", (d, w) -> confirmFakeCardWarningOne(target, selected[0] == 1))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.continue_to_warnings, (d, w) -> confirmFakeCardWarningOne(target, selected[0] == 1))
                 .show();
     }
 
     private void confirmFakeCardWarningOne(FakeCardTarget target, boolean full) {
         String message = full
-                ? "The full test overwrites every sector on the USB card. All existing data will be destroyed and cannot be recovered by this app. It may take many hours."
-                : "The quick test overwrites up to 1 GiB in scattered areas across the USB card. Files or filesystem data may be destroyed or corrupted. Assume you will lose everything on it. This cannot be undone.";
+                ? getString(R.string.fake_warning_one_full)
+                : getString(R.string.fake_warning_one_quick);
         new android.app.AlertDialog.Builder(this)
-                .setTitle("WARNING 1 OF 3 — DATA LOSS")
+                .setTitle(R.string.warning_one_title)
                 .setMessage(message)
-                .setNegativeButton("CANCEL", null)
-                .setPositiveButton("I UNDERSTAND — CONTINUE", (d, w) -> confirmFakeCardWarningTwo(target, full))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.understand_continue, (d, w) -> confirmFakeCardWarningTwo(target, full))
                 .show();
     }
 
     private void confirmFakeCardWarningTwo(FakeCardTarget target, boolean full) {
         String testDetails = full
-                ? "The app will write and verify every reported sector, then read the full card. This can take many hours."
-                : "The app will overwrite up to 1 GiB in 1 MiB blocks scattered across the reported capacity, then verify those blocks. This is much faster but can miss some fakes or faults.";
+                ? getString(R.string.fake_warning_two_full)
+                : getString(R.string.fake_warning_two_quick);
         new android.app.AlertDialog.Builder(this)
-                .setTitle("WARNING 2 OF 3 — CHECK THE DEVICE")
-                .setMessage("The only target is this USB removable device:\n\n" + target.vendor + " " + target.product +
-                        "\n" + formatCapacity(target.capacityBytes) + "\n\n" + testDetails + " A counterfeit controller may map distant addresses onto the same storage. Disconnecting or losing power can leave the card unusable. Internal NAND and the built-in SD slot are not touched.")
-                .setNegativeButton("CANCEL", null)
-                .setPositiveButton("THAT USB CARD — CONTINUE", (d, w) -> confirmFakeCardWarningThree(target, full))
+                .setTitle(R.string.warning_two_title)
+                .setMessage(getString(R.string.fake_warning_two_prefix) + target.vendor + " " + target.product +
+                        "\n" + formatCapacity(target.capacityBytes) + "\n\n" + testDetails + getString(R.string.fake_warning_two_suffix))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.usb_card_continue, (d, w) -> confirmFakeCardWarningThree(target, full))
                 .show();
     }
 
     private void confirmFakeCardWarningThree(FakeCardTarget target, boolean full) {
         EditText confirmation = new EditText(this);
         confirmation.setSingleLine(true);
-        confirmation.setHint("Type ERASE to enable the final button");
+        confirmation.setHint(R.string.type_erase_hint);
         String finalMessage = full
-                ? "Final check: every sector on the USB card will be overwritten; all existing data will be lost. Type ERASE below to start the full test. No reports are saved to internal storage."
-                : "Final check: scattered test areas on this USB card will be overwritten and existing files may be corrupted. Assume the card’s contents are lost. Type ERASE below to start. No reports are saved to internal storage.";
+                ? getString(R.string.fake_warning_three_full)
+                : getString(R.string.fake_warning_three_quick);
         android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
-                .setTitle("WARNING 3 OF 3 — FINAL CONFIRMATION")
+                .setTitle(R.string.warning_three_title)
                 .setMessage(finalMessage)
                 .setView(confirmation)
-                .setNegativeButton("CANCEL", null)
-                .setPositiveButton("ERASE USB CARD & TEST", null)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.erase_usb_card_test, null)
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (!"ERASE".equalsIgnoreCase(confirmation.getText().toString().trim())) {
@@ -754,18 +791,18 @@ public class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         setResponsivePadding(layout, 20, 20, 20, 20);
         TextView title = new TextView(this);
-        title.setText("DESTRUCTIVE USB CARD TEST");
+        title.setText(R.string.destructive_usb_card_test);
         setResponsiveTextSize(title, 22f);
         title.setTextColor(Color.rgb(220, 35, 55));
         TextView device = new TextView(this);
         device.setText(target.vendor + " " + target.product + " • " + formatCapacity(target.capacityBytes));
         fakeCardProgressText = new TextView(this);
-        fakeCardProgressText.setText("Rechecking USB target before any write…");
+        fakeCardProgressText.setText(R.string.fake_test_rechecking);
         setResponsivePadding(fakeCardProgressText, 0, 24, 0, 16);
         fakeCardProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         fakeCardProgressBar.setMax(1000);
         Button cancel = new Button(this);
-        cancel.setText("CANCEL TEST");
+        cancel.setText(R.string.cancel_test);
         fakeCardCancelButton = cancel;
         layout.addView(title);
         layout.addView(device);
@@ -782,12 +819,12 @@ public class MainActivity extends Activity {
     private void requestFakeCardCancel() {
         if (!fakeCardTestRunning) return;
         new android.app.AlertDialog.Builder(this)
-                .setTitle("Stop the USB card test?")
-                .setMessage("Some data may already have been overwritten. The card will be left partially tested and may not contain usable files.")
-                .setNegativeButton("KEEP TESTING", null)
-                .setPositiveButton("STOP AFTER CURRENT USB COMMAND", (d, w) -> {
+                .setTitle(R.string.fake_test_stop_title)
+                .setMessage(R.string.fake_test_stop_message)
+                .setNegativeButton(R.string.fake_test_keep_testing, null)
+                .setPositiveButton(R.string.stop_after_usb_command, (d, w) -> {
                     fakeCardCancelRequested = true;
-                    if (fakeCardProgressText != null) fakeCardProgressText.setText("Stopping after the current USB command… Data may already be destroyed.");
+                    if (fakeCardProgressText != null) fakeCardProgressText.setText(R.string.fake_test_stopping);
                 }).show();
     }
 
@@ -1193,15 +1230,15 @@ public class MainActivity extends Activity {
         setResponsivePadding(layout, 20, 20, 20, 20);
 
         Button backButton = new Button(this);
-        backButton.setText("BACK");
+        backButton.setText(R.string.back);
         TextView title = new TextView(this);
-        title.setText("SETTINGS & THEMES");
+        title.setText(R.string.settings_themes_title);
         setResponsiveTextSize(title, 22f);
         title.setTextColor(Color.BLACK);
         setResponsivePadding(title, 0, 14, 0, 16);
 
         TextView description = new TextView(this);
-        description.setText("Pick the look that suits you. Standard stays simple; Retro Neon brings the arcade colours.");
+        description.setText(R.string.settings_description);
         setResponsiveTextSize(description, 16f);
         description.setTextColor(Color.DKGRAY);
         setResponsivePadding(description, 0, 0, 0, 12);
@@ -1209,10 +1246,10 @@ public class MainActivity extends Activity {
         RadioGroup themes = new RadioGroup(this);
         themes.setOrientation(RadioGroup.VERTICAL);
         String[] names = {
-                "Standard Light",
-                "Standard Dark",
-                "Retro Neon Dark",
-                "Retro Neon Light"
+                getString(R.string.theme_standard_light),
+                getString(R.string.theme_standard_dark),
+                getString(R.string.theme_retro_dark),
+                getString(R.string.theme_retro_light)
         };
         for (int i = 0; i < names.length; i++) {
             RadioButton option = new RadioButton(this);
@@ -1407,14 +1444,14 @@ public class MainActivity extends Activity {
         header.setOrientation(LinearLayout.HORIZONTAL);
 
         Button backButton = new Button(this);
-        backButton.setText("BACK");
+        backButton.setText(R.string.back);
 
         surfaceCancelButton = new Button(this);
         surfaceCancelButton.setText("CANCEL");
         surfaceCancelButton.setVisibility(View.GONE);
 
         TextView title = new TextView(this);
-        title.setText("  HDD SMART INFO");
+        title.setText("  " + getString(R.string.hdd_smart_info));
         setResponsiveTextSize(title, 22f);
         title.setTextColor(Color.BLACK);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -1434,16 +1471,16 @@ public class MainActivity extends Activity {
         setResponsivePadding(safety, 0, 15, 0, 15);
 
         Button scanButton = new Button(this);
-        scanButton.setText("SCAN USB");
+        scanButton.setText(R.string.scan_usb);
 
         Button smartButton = new Button(this);
-        smartButton.setText("READ SMART DATA");
+        smartButton.setText(R.string.read_smart_data);
 
         Button surfaceButton = new Button(this);
-        surfaceButton.setText("HDD SURFACE TEST");
+        surfaceButton.setText(R.string.hdd_surface_test);
 
         Button disconnectButton = new Button(this);
-        disconnectButton.setText("SAFE DISCONNECT USB");
+        disconnectButton.setText(R.string.safe_disconnect_usb);
 
         output = new TextView(this);
         setResponsiveTextSize(output, 14f);
@@ -1513,7 +1550,7 @@ public class MainActivity extends Activity {
         Button backButton = new Button(this);
         backButton.setText("BACK");
         TextView title = new TextView(this);
-        title.setText("  HDD SURFACE TEST");
+        title.setText("  " + getString(R.string.surface_info_title));
         setResponsiveTextSize(title, 22f);
         title.setTextColor(Color.BLACK);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -1525,16 +1562,13 @@ public class MainActivity extends Activity {
         setResponsiveTextSize(info, 16f);
         info.setTextColor(Color.DKGRAY);
         setResponsivePadding(info, 0, 18, 0, 18);
-        info.setText("This test reads the drive from beginning to end to check that its data can be read.\n\n"
-                + "READ-ONLY: it does not write to, format, or partition the drive.\n\n"
-                + "It can take a while, depending on the drive, USB reader, and connection. Read errors are retried and reported. If the USB connection itself fails, the test stops.\n\n"
-                + "Keep the drive connected while the test runs. You can cancel from the test screen; Back will ask before stopping it.");
+        info.setText(R.string.surface_info_explanation);
 
         surfaceDeviceInfoText = new TextView(this);
         setResponsiveTextSize(surfaceDeviceInfoText, 16f);
         surfaceDeviceInfoText.setTextColor(Color.BLACK);
         setResponsivePadding(surfaceDeviceInfoText, 0, 8, 0, 18);
-        surfaceDeviceInfoText.setText("Reading connected drive information…");
+        surfaceDeviceInfoText.setText(R.string.reading_drive_info);
 
         LinearLayout infoContent = new LinearLayout(this);
         infoContent.setOrientation(LinearLayout.VERTICAL);
@@ -1542,10 +1576,10 @@ public class MainActivity extends Activity {
         infoContent.addView(surfaceDeviceInfoText);
 
         Button refreshButton = new Button(this);
-        refreshButton.setText("READ DEVICE INFO AGAIN");
+        refreshButton.setText(R.string.read_drive_info_again);
 
         Button startButton = new Button(this);
-        startButton.setText("START TEST");
+        startButton.setText(R.string.start_test);
         startButton.setEnabled(false);
         surfaceInfoStartButton = startButton;
 
@@ -1572,7 +1606,7 @@ public class MainActivity extends Activity {
         surfaceInfoProbeRunning = true;
         runOnUiThread(() -> {
             if (surfaceDeviceInfoText != null) {
-                surfaceDeviceInfoText.setText("Reading connected drive information…");
+                surfaceDeviceInfoText.setText(R.string.reading_drive_info);
             }
             if (surfaceInfoStartButton != null) {
                 surfaceInfoStartButton.setEnabled(false);
@@ -2334,15 +2368,15 @@ public class MainActivity extends Activity {
         setResponsivePadding(layout, 20, 20, 20, 20);
 
         Button backButton = new Button(this);
-        backButton.setText("BACK");
+        backButton.setText(R.string.back);
         TextView title = new TextView(this);
-        title.setText("SD CARD & INTERNAL STORAGE");
+        title.setText(R.string.storage_media_title);
         setResponsiveTextSize(title, 22f);
         title.setTextColor(Color.BLACK);
         setResponsivePadding(title, 0, 12, 0, 12);
 
         Button scanButton = new Button(this);
-        scanButton.setText("SCAN SD CARD & NAND");
+        scanButton.setText(R.string.scan_sd_nand);
         TextView results = new TextView(this);
         setResponsiveTextSize(results, 15f);
         results.setTextColor(Color.BLACK);
