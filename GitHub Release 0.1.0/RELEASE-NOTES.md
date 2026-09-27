@@ -11,6 +11,9 @@ This is an early testing release of the separate Fake Card Edition app.
 - App pages scroll if content is longer than the screen, and Android system-bar spacing keeps controls clear of navigation buttons.
 - About / Support includes Rich's Buy Me a Coffee page.
 - USB data transfers are split into device-friendly chunks, and progress updates are throttled to keep the interface responsive on phones.
+- Added a language picker for English, German, Spanish, French, Italian, Brazilian Portuguese, Dutch, Polish, Russian, Japanese, Simplified Chinese, Korean, and Turkish. System-language selection follows Android locale resources.
+- Fixed padding restoration for theme controls so switching themes does not distort controls when returning to Settings. Fixed language selection so chosen app languages are applied after Settings is closed.
+- Kept the fake-card test algorithm unchanged.
 
 ## Before installing or testing
 - Android 9 (API 28) or newer is required.
@@ -21,4 +24,5 @@ This is an early testing release of the separate Fake Card Edition app.
 - Test reports stay in memory and are not saved to internal storage.
 
 ## Build
-Built with `gradlew.bat assembleDebug` on 2026-09-24. The source archive includes the project source, build wrapper, project licence, and required third-party licence notices. Device identifiers, user-specific card test results, and debug logs are not included.
+Built with `gradlew.bat assembleDebug` on 2026-09-27. The source archive includes the complete Android project, build wrapper, project licence, and required third-party licence notices. Device identifiers, user-specific card test results, local build settings, and debug logs are not included.
+

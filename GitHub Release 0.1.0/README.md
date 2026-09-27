@@ -14,6 +14,11 @@ The APK in this release folder is a debug build for phone testing. Android 9 (AP
 
 The source is provided under the Smart HDD personal, non-commercial source-available licence in `LICENSE`. The project licence and third-party build-tool notices are included in this release folder.
 
+## Languages
+
+The app follows the Android system language by default. Settings also lets you choose English, German, Spanish, French, Italian, Brazilian Portuguese, Dutch, Polish, Russian, Japanese, Simplified Chinese, Korean, or Turkish. The main interface, settings, surface-test information, and destructive-test warnings are translated; less common screens and detailed SMART or storage diagnostics may still use English. English is the fallback for any untranslated text.
+
 ## Support
 
-If you enjoy this app and find it useful please feel free to Buy Me a Coffee: https://buymeacoffee.com/richsretro
+Buy Me a Coffee: https://buymeacoffee.com/richsretro
+
