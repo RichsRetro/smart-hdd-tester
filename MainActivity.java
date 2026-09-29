@@ -1067,13 +1067,17 @@ public class MainActivity extends Activity {
     private static long[] buildCanaryLbas(long totalSectors) {
         TreeSet<Long> points = new TreeSet<>();
         points.add(0L);
-        points.add(totalSectors / 16);
-        points.add(totalSectors / 8);
-        points.add(totalSectors / 4);
-        points.add(totalSectors / 2);
-        points.add((totalSectors * 3) / 4);
-        points.add((totalSectors * 7) / 8);
-        points.add((totalSectors * 15) / 16);
+        // Probe fixed, human-readable decimal checkpoints, not fractions of the
+        // device's claimed capacity. This avoids an implausible 1 TB report
+        // causing an immediate marker at roughly 132 GB.
+        final long firstCheckpointBytes = 8_000_000_000L;
+        final long sectorBytes = 512L;
+        long checkpointSectors = firstCheckpointBytes / sectorBytes;
+        while (checkpointSectors < totalSectors) {
+            points.add(checkpointSectors);
+            if (checkpointSectors > Long.MAX_VALUE / 2) break;
+            checkpointSectors *= 2;
+        }
         if (totalSectors > 1) points.add(totalSectors - 1);
         long[] result = new long[points.size()];
         int index = 0;
@@ -1119,7 +1123,7 @@ public class MainActivity extends Activity {
                         canaryLba, sourceLba, formatCapacity(sourceLba * 512L), estimate), false);
             }
             return new TestOutcome(getString(R.string.fake_card_canary_media_corruption,
-                    canaryLba, formatCapacity(progressLba * 512L)), false);
+                    formatCapacity(progressLba * 512L), canaryLba), false);
         }
         return null;
     }
