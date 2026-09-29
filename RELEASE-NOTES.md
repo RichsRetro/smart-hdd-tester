@@ -1,8 +1,13 @@
-# Smart HDD Tester + Fake Card Detector 0.1.1 — testing build
+# Smart HDD Tester + Fake Card Detector 0.1.2 — testing build
 
-This is a bug-fix testing release of the separate Fake Card Edition app.
+This is a feature and bug-fix testing release of the separate Fake Card Edition app.
 
-## Changes in 0.1.1
+## Changes in 0.1.2
+- If a tiny full-test setup marker fails without a USB communication failure or confirmed capacity aliasing, the result offers **Run Full Test Anyway**. This lets the sequential write/read pass locate a usable boundary instead of treating the setup marker as the capacity result.
+- Continuing retains only lower-address markers that passed setup and skips the failed and unverified higher markers. The normal sequential test and its aliasing/failure checks then continue unchanged.
+- The extra confirmation explains that the test destroys all data, may take hours, and that the failed marker's position is not the amount written or the card's true capacity. Added localized text for every supported app language.
+
+## Earlier 0.1.1 changes
 - Full-test setup markers now use fixed 8, 16, 32, 64 GB and later checkpoints rather than fractions of device-reported capacity. A drive falsely reporting 1 TB will no longer make the initial probe jump to about 132 GB.
 - Early setup failures now explain that the app checked only a tiny 512-byte marker, show the checkpoint, clarify that the full write/read pass had not started, and explain why it stopped.
 - A failed marker readback is not reported as confirmed fake capacity unless the app finds an intact pattern belonging to a different logical address.

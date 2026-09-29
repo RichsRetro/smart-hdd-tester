@@ -2,7 +2,7 @@
 
 An offline Android storage diagnostic tool with read-only SMART and surface checks, plus a separate destructive USB fake-card capacity test. I made this totally offline and read-only, other than the fake-card testing section. The destructive test only works with storage connected through the USB port and cannot access the tablet's internal NAND or SD card slot. 100% offline, no annoying ads, no “buy now for the Pro version” nonsense — nothing like that. Just an honest, easy-to-use app. I have tested it on phones and a Fire OS tablet using both fake SD cards and genuine cards.
 
-The full fake-card test writes each block and reads it back before moving on. Before that full pass starts, it checks a few tiny 512-byte markers at fixed 8 GB, 16 GB, 32 GB, 64 GB and later checkpoints. That way the check locations do not jump to odd places just because a device claims a ridiculous capacity. If one of those markers fails, the result explains that only the small setup checks ran, how far it got, and why it stopped. A bad marker on its own does not prove a card is fake; the app only calls capacity aliasing when it actually finds another address's intact pattern. The quick check still writes and reads scattered sample blocks, and the full test still checks two extra blocks after a repeated failure before reporting the failure boundary.
+The full fake-card test writes each block and reads it back before moving on. Before that full pass starts, it checks a few tiny 512-byte markers at fixed 8 GB, 16 GB, 32 GB, 64 GB and later checkpoints. That way the check locations do not jump to odd places just because a device claims a ridiculous capacity. If one of those markers fails, the result explains that only the small setup checks ran, how far it got, and why it stopped. When the device is still communicating and aliasing has not been confirmed, you can choose to continue with the sequential full test anyway. It keeps checking lower-address markers that already passed, skips the failed and unverified higher markers, and may show the usable limit if the card fails again during the full pass. A bad marker on its own does not prove a card is fake; the app only calls capacity aliasing when it actually finds another address's intact pattern. The quick check still writes and reads scattered sample blocks, and the full test still checks two extra blocks after a repeated failure before reporting the failure boundary.
 
 ## Why I built this
 
@@ -14,7 +14,7 @@ The Fake Card Detector writes test data to the selected USB mass-storage card an
 
 ## Install
 
-The APK in the v0.1.1 release is a debug build for testing, not a production-signed release. Android 9 (API 28) or newer is required. Enable installation from your file manager when Android asks. This update uses the same debug signing key as v0.1.0.
+The APK in the v0.1.2 release is a debug build for testing, not a production-signed release. Android 9 (API 28) or newer is required. Enable installation from your file manager when Android asks. This update uses the same debug signing key as v0.1.0 and v0.1.1.
 
 ## Languages
 
@@ -22,7 +22,7 @@ The app follows the Android system language by default. Settings also lets you c
 
 ## Source and licence
 
-The complete Android project is included in the v0.1.1 source archive. The source is provided under the Smart HDD personal, non-commercial source-available licence. You may inspect, build, and privately modify your own copy; commercial use, resale, and rebranding are not permitted. Third-party build-tool notices are included alongside the project licence.
+The complete Android project is included in the v0.1.2 source archive. The source is provided under the Smart HDD personal, non-commercial source-available licence. You may inspect, build, and privately modify your own copy; commercial use, resale, and rebranding are not permitted. Third-party build-tool notices are included alongside the project licence.
 
 ## Support
 

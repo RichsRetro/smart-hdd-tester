@@ -782,7 +782,11 @@ public class MainActivity extends Activity {
     }
 
     private void startFakeCardTest(FakeCardTarget target, boolean full) {
-        if (askBeforeInterruptingUsb(() -> startFakeCardTest(target, full))) return;
+        startFakeCardTest(target, full, -1L);
+    }
+
+    private void startFakeCardTest(FakeCardTarget target, boolean full, long skipCanariesAtOrAbove) {
+        if (askBeforeInterruptingUsb(() -> startFakeCardTest(target, full, skipCanariesAtOrAbove))) return;
         showingHome = false;
         fakeCardInfoScreenVisible = false;
         fakeCardTestRunning = true;
@@ -813,7 +817,7 @@ public class MainActivity extends Activity {
         setKeepScreenAwake(true);
         cancel.setOnClickListener(v -> requestFakeCardCancel());
         title.setText(full ? "FULL USB CARD WRITE TEST" : "QUICK RANDOMIZED USB TEST");
-        new Thread(() -> runFakeCardTest(target, full), "fake-card-test").start();
+        new Thread(() -> runFakeCardTest(target, full, skipCanariesAtOrAbove), "fake-card-test").start();
     }
 
     private void requestFakeCardCancel() {
@@ -828,9 +832,11 @@ public class MainActivity extends Activity {
                 }).show();
     }
 
-    private void runFakeCardTest(FakeCardTarget target, boolean full) {
+    private void runFakeCardTest(FakeCardTarget target, boolean full, long skipCanariesAtOrAbove) {
         String result = "";
         boolean success = false;
+        boolean canRunFullAnyway = false;
+        long failedCanaryLba = -1L;
         botTransportFailed = false;
         botTransportFailure = null;
         long totalSectors = target.lastLba + 1;
@@ -853,9 +859,11 @@ public class MainActivity extends Activity {
                 if (!sameTarget || capacity.blockSize != 512) {
                     result = "The connected USB target changed since confirmation. Test aborted before any write.";
                 } else if (full) {
-                    TestOutcome outcome = runFullCardWriteTest(totalSectors);
+                    TestOutcome outcome = runFullCardWriteTest(totalSectors, skipCanariesAtOrAbove);
                     result = outcome.message;
                     success = outcome.success;
+                    canRunFullAnyway = outcome.canRunFullAnyway;
+                    failedCanaryLba = outcome.canaryFailureLba;
                 } else {
                     long regionCount = totalSectors / blocksPerChunk;
                     int sampleCount = (int)Math.min(1024L, regionCount);
@@ -964,24 +972,53 @@ public class MainActivity extends Activity {
             setKeepScreenAwake(false);
             final String finalResult = result.isEmpty() ? "Test stopped. Check the USB connection and card." : result;
             final boolean passed = success;
+            final boolean offerFullAnyway = full && canRunFullAnyway;
+            final long retryCanaryLimit = failedCanaryLba;
             runOnUiThread(() -> {
                 if (fakeCardProgressBar != null) fakeCardProgressBar.setProgress(passed ? 1000 : fakeCardProgressBar.getProgress());
                 if (fakeCardProgressText != null) fakeCardProgressText.setText(finalResult + "\n\nNo report was saved to internal storage.");
                 if (fakeCardCancelButton != null) {
-                    fakeCardCancelButton.setText("DONE");
-                    fakeCardCancelButton.setOnClickListener(v -> showHome());
+                    if (offerFullAnyway) {
+                        fakeCardCancelButton.setText(R.string.fake_card_continue_anyway);
+                        fakeCardCancelButton.setOnClickListener(v -> confirmFakeCardContinueAnyway(target, retryCanaryLimit));
+                    } else {
+                        fakeCardCancelButton.setText("DONE");
+                        fakeCardCancelButton.setOnClickListener(v -> showHome());
+                    }
                 }
                 runPendingUsbAction();
             });
         }
     }
 
-    private TestOutcome runFullCardWriteTest(long totalSectors) {
+    private void confirmFakeCardContinueAnyway(FakeCardTarget target, long failedCanaryLba) {
+        String position = formatCapacity(failedCanaryLba * 512L);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.fake_card_canary_override_title)
+                .setMessage(getString(R.string.fake_card_canary_override_message, position))
+                .setNegativeButton(R.string.fake_card_stop_after_check, null)
+                .setPositiveButton(R.string.fake_card_continue_anyway,
+                        (d, w) -> startFakeCardTest(target, true, failedCanaryLba))
+                .show();
+    }
+
+    private TestOutcome runFullCardWriteTest(long totalSectors, long skipCanariesAtOrAbove) {
         final int maxBlocks = 8192; // 4 MiB per command; the last chunk may be smaller.
         long completed = 0;
         long isolatedReadErrors = 0;
         publishFakeProgress(0, "Writing and reading each 4 MiB block…\nThe test stops at the first failure. Existing data is being destroyed.");
         long[] canaryLbas = buildCanaryLbas(totalSectors);
+        if (skipCanariesAtOrAbove >= 0) {
+            // If the user elects to continue after a failed setup marker, retain only
+            // canaries already verified below that address. The sequential pass can
+            // then locate the usable boundary without immediately repeating the same probe.
+            int retained = 0;
+            for (long lba : canaryLbas) if (lba < skipCanariesAtOrAbove) retained++;
+            long[] verifiedCanaries = new long[retained];
+            int next = 0;
+            for (long lba : canaryLbas) if (lba < skipCanariesAtOrAbove) verifiedCanaries[next++] = lba;
+            canaryLbas = verifiedCanaries;
+        }
         TestOutcome canarySetup = establishPersistentCanaries(canaryLbas, totalSectors);
         if (canarySetup != null) return canarySetup;
         publishFakeProgress(0, getString(R.string.fake_card_canaries_ready));
@@ -1093,7 +1130,8 @@ public class MainActivity extends Activity {
             if (!performWrite10(lba, 1, expected)) {
                 int message = botTransportFailed ? R.string.fake_card_canary_usb_write_error
                         : R.string.fake_card_canary_media_write_error;
-                return new TestOutcome(getString(message, lba, safe(botTransportFailure)), false);
+                return new TestOutcome(getString(message, lba, safe(botTransportFailure)), false,
+                        !botTransportFailed && lba > 0, lba);
             }
             TestOutcome check = inspectPersistentCanaries(canaryLbas, i + 1, totalSectors, lba);
             if (check != null) return check;
@@ -1109,7 +1147,8 @@ public class MainActivity extends Activity {
             if (actual == null || actual.length < 512) {
                 int message = botTransportFailed ? R.string.fake_card_canary_usb_read_error
                         : R.string.fake_card_canary_media_read_error;
-                return new TestOutcome(getString(message, canaryLba, safe(botTransportFailure)), false);
+                return new TestOutcome(getString(message, canaryLba, safe(botTransportFailure)), false,
+                        !botTransportFailed && canaryLba > 0, canaryLba);
             }
             if (isPatternSector(actual, 0, canaryLba)) continue;
             long sourceLba = ByteBuffer.wrap(actual, 0, 8).order(ByteOrder.LITTLE_ENDIAN).getLong();
@@ -1123,7 +1162,8 @@ public class MainActivity extends Activity {
                         canaryLba, sourceLba, formatCapacity(sourceLba * 512L), estimate), false);
             }
             return new TestOutcome(getString(R.string.fake_card_canary_media_corruption,
-                    formatCapacity(progressLba * 512L), canaryLba), false);
+                    formatCapacity(progressLba * 512L), canaryLba), false,
+                    !botTransportFailed && canaryLba > 0, canaryLba);
         }
         return null;
     }
@@ -3379,9 +3419,16 @@ public class MainActivity extends Activity {
     private static class TestOutcome {
         final String message;
         final boolean success;
+        final boolean canRunFullAnyway;
+        final long canaryFailureLba;
         TestOutcome(String message, boolean success) {
+            this(message, success, false, -1L);
+        }
+        TestOutcome(String message, boolean success, boolean canRunFullAnyway, long canaryFailureLba) {
             this.message = message;
             this.success = success;
+            this.canRunFullAnyway = canRunFullAnyway;
+            this.canaryFailureLba = canaryFailureLba;
         }
     }
 
